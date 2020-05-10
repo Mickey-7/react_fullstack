@@ -1,0 +1,670 @@
+reference : https://bezkoder.com/node-js-express-sequelize-mysql/
+
+create folder_project then open folder using Visual Studio Code
+    follow the config on the reference to generate package.json, do 
+    the config on terminal within the directoy of the project folder
+
+        npm init
+
+        name: (nodejs-express-sequelize-mysql) 
+        version: (1.0.0) 
+        description: Node.js Rest Apis with Express, Sequelize & MySQL.
+        entry point: (index.js) server.js
+        test command: 
+        git repository: 
+        keywords: nodejs, express, sequelize, mysql, rest, api
+        author: bezkoder
+        license: (ISC)
+
+        Is this ok? (yes) yes
+
+    terminal output :
+    
+        C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql>npm init
+        This utility will walk you through creating a package.json file.
+        It only covers the most common items, and tries to guess sensible defaults.
+
+        See `npm help json` for definitive documentation on these fields
+        and exactly what they do.
+
+        Use `npm install <pkg>` afterwards to install a package and
+        save it as a dependency in the package.json file.
+
+        Press ^C at any time to quit.
+        package name: (express-sequelize-mysql) nodejs-express-sequelize-mysql
+        version: (1.0.0)
+        description: Node.js Rest Apis with Express, Sequelize & MySQL
+        entry point: (index.js) server.js
+        test command:
+        git repository:
+        keywords: nodejs, express, sequelize, mysql, rest, api
+        author: me
+        license: (ISC)
+        About to write to C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql\package.json:
+
+        {
+        "name": "nodejs-express-sequelize-mysql",
+        "version": "1.0.0",
+        "description": "Node.js Rest Apis with Express, Sequelize & MySQL",
+        "main": "server.js",
+        "scripts": {
+            "test": "echo \"Error: no test specified\" && exit 1"
+        },
+        "keywords": [
+            "nodejs",
+            "express",
+            "sequelize",
+            "mysql",
+            "rest",
+            "api"
+        ],
+        "author": "me",
+        "license": "ISC"
+        }
+
+
+        Is this OK? (yes)
+
+    package.json content :
+
+        {
+            "name": "nodejs-express-sequelize-mysql",
+            "version": "1.0.0",
+            "description": "Node.js Rest Apis with Express, Sequelize & MySQL",
+            "main": "server.js",
+            "scripts": {
+                "test": "echo \"Error: no test specified\" && exit 1"
+            },
+            "keywords": [
+                "nodejs",
+                "express",
+                "sequelize",
+                "mysql",
+                "rest",
+                "api"
+            ],
+            "author": "me",
+            "license": "ISC"
+        }
+
+
+---------------------------------------------------------------------------------------------
+
+We need to install necessary modules: express, sequelize, mysql2 and body-parser.
+    
+    npm install express sequelize mysql2 body-parser cors 
+
+    package.json content after installing modules
+
+        {
+            "name": "nodejs-express-sequelize-mysql",
+            "version": "1.0.0",
+            "description": "Node.js Rest Apis with Express, Sequelize & MySQL",
+            "main": "server.js",
+            "scripts": {
+                "test": "echo \"Error: no test specified\" && exit 1"
+            },
+            "keywords": [
+                "nodejs",
+                "express",
+                "sequelize",
+                "mysql",
+                "rest",
+                "api"
+            ],
+            "author": "me",
+            "license": "ISC",
+            "dependencies": {
+                "body-parser": "^1.19.0",
+                "cors": "^2.8.5",
+                "express": "^4.17.1",
+                "mysql2": "^2.1.0",
+                "sequelize": "^5.21.7"
+            }
+        }
+
+---------------------------------------------------------------------------------------------
+
+Setup Express web server
+    In the root folder (project folder - same directory of package.json), 
+    let’s create a new server.js file:
+
+        // invoke modules
+        const express = require("express");
+        const bodyParser = require("body-parser");
+        const cors = require("cors");
+
+        // invoke express to our app variable
+        const app = express();
+
+        // declaring url for backend
+        var corsOptions = {
+        origin: "http://localhost:8080/api",
+        };
+        //invoking the url cors to our app
+        app.use(cors(corsOptions));
+
+        // invoking bodyParser for content-type - application/json to our app
+        app.use(bodyParser.json());
+        // invoking bodyParser for content-type - application/x-www-form-urlencoded to our app
+        app.use(bodyParser.urlencoded({ extended: true }));
+
+        // define simple get method for test on Postman
+        app.get("/", (req, res) => {
+        res.json({
+            message: "Welcome to backend"
+        });
+        });
+
+        // set prompt, listen for requests
+        const PORT = process.env.PORT || 8080;
+        app.listen(PORT, () => {
+        console.log(`Server is runnong on port ${PORT}`);
+        });
+
+    What we do are:
+        – import express, body-parser and cors modules:
+
+        Express is for building the Rest apis
+        body-parser helps to parse the request and create the req.body object
+        cors provides Express middleware to enable CORS with various options.
+        – create an Express app, then add body-parser and cors middlewares using app.use() method. Notice that we set origin: http://localhost:8081.
+        – define a GET route which is simple for test.
+        – listen on port 8080 for incoming requests.
+
+    Now let’s run the app on terminal with command: 
+        node server.js
+    Open your browser with url http://localhost:8080/, you will see:
+
+    terminal output :
+        C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql>node server
+        Server is runnong on port 8080
+    web browser output : 
+        {"message":"Welcome to backend"}
+
+---------------------------------------------------------------------------------------------
+
+Configure MySQL database & Sequelize
+    Inside the root folder - same directory with package.json,
+    create app folder which will hold all the folders we will make.
+    In the app folder, we create a separate config folder 
+    for configuration with db.config.js file like this:
+
+        module.exports = {
+            HOST : "localhost",
+            USER : "root",
+            PASSWORD : "PASSWORD",
+            DB : "testDB" ,
+            dialect : "mysql",
+            pool : {
+                max : 5,
+                min : 0,
+                acquire : 30000,
+                idle : 10000
+            }
+        }
+
+    First five parameters are for MySQL connection.
+    pool is optional, it will be used for Sequelize connection pool configuration:
+
+    max: maximum number of connection in pool
+    min: minimum number of connection in pool
+    idle: maximum time, in milliseconds, that a connection can be idle before being released
+    acquire: maximum time, in milliseconds, that pool will try to get connection before throwing error
+
+---------------------------------------------------------------------------------------------
+
+Initialize Sequelize
+    We’re gonna initialize Sequelize in app/models 
+    folder that will contain model in the next step.
+
+    Now create app/models/index.js with the following code:
+
+        // invoke db.config.js
+        const dbConfig = require("../config/db.config");
+
+        //invoke sequelize
+        const Sequelize = require("sequelize");
+        // create sequelize with dbConfig configuration
+        const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
+        host: dbConfig.HOST,
+        dialect: dbConfig.dialect,
+        operatorsAliases: false,
+        pool: {
+            max: dbConfig.pool.max,
+            min: dbConfig.pool.min,
+            acquire: dbConfig.pool.acquire,
+            idle: dbConfig.pool.idle,
+        },
+        });
+
+        //create db object
+        const db = {};
+
+        //invoke sequelize & Sequelize to db
+        db.Sequelize = Sequelize;
+        db.sequelize = sequelize;
+
+        //invoking the tutorial.model.js file which represents tutorials table in db
+        db.tutorials = require("./tutorial.model.js")(sequelize, Sequelize);
+
+        //exporting ad module
+        module.exports = db;
+
+    Don’t forget to call sync() method in server.js:
+        const db = require("./app/models");
+        db.sequelize.sync();
+
+    In development, you may need to drop existing tables and re-sync database. 
+    Just use force: true as following code:
+        db.sequelize.sync({ force: true }).then(() => {
+            console.log("Drop and re-sync db.");
+        });
+
+---------------------------------------------------------------------------------------------
+
+Define the Sequelize Model
+    In models folder, create tutorial.model.js file like this:
+
+        //invoking sequelize & Sequelize
+        module.exports = (sequelize, Sequelize) => {
+        //define table and fields
+        const Tutorial = sequelize.define("tutorial", {
+            title: {
+                type: Sequelize.STRING,
+            },
+            description: {
+                type: Sequelize.STRING,
+            },
+            published: {
+                type: Sequelize.BOOLEAN,
+            },
+        });
+
+            return Tutorial;
+        };
+
+    This Sequelize Model represents tutorials table in MySQL database. These columns will be generated automatically: id, title, description, published, createdAt, updatedAt.
+
+    After initializing Sequelize, we don’t need to write CRUD functions, Sequelize supports all of them:
+
+        create a new Tutorial: create(object)
+        find a Tutorial by id: findByPk(id)
+        get all Tutorials: findAll()
+        update a Tutorial by id: update(data, where: { id: id })
+        remove a Tutorial: destroy(where: { id: id })
+        remove all Tutorials: destroy(where: {})
+        find all Tutorials by title: findAll({ where: { title: ... } })
+        These functions will be used in our Controller.
+
+---------------------------------------------------------------------------------------------
+
+Create the Controller
+    Inside app/controllers folder, let’s create tutorial.controller.js 
+    with these CRUD functions:
+        create
+        findAll
+        findOne
+        update
+        delete
+        deleteAll
+        findAllPublished
+
+        // invoke index.js from models folder
+        const db = require("../models");
+        //invoking the database table
+        const Tutorial = db.tutorials;
+        ///invoking Sequelize
+        const Op = db.Sequelize.Op;
+
+        //create
+            exports.create = (req, res) => {
+                //validate input tile must not be empty
+                if (!req.body.title) {
+                    res.status(400).send({
+                    message: "title must not be emplty!",
+                    });
+                    return;
+                }
+
+                //create tutorial
+                const tutorial = {
+                    title: req.body.title,
+                    description: req.body.descripton,
+                    published: req.body.published ? req.body.published : false,
+                };
+
+                //save tutorial in database
+                Tutorial.create(tutorial)
+                    .then((data) => {
+                    res.send(data);
+                    })
+                    .catch((err) => {
+                    res.status(500).send({
+                        message: err.message || "Some error occured while creating tutorial",
+                    });
+                    });
+            };
+
+        //retrieve object (with condition)
+            exports.findAll = (req, res) => {
+            //create storage for title query
+            const title = req.query.title;
+            // invoke condirtion for the title query
+            var condition = title ? { title: { [Op.like]: `%${title}%` } } : null;
+
+            //invoking the condition and access database
+            Tutorial.findAll({ where: condition })
+                .then((data) => {
+                res.send(data);
+                })
+                .catch((err) => {
+                res.status(500).send({
+                    message: err.message || "Some error occured while retrieving tutorial;",
+                });
+                });
+
+            // We use req.query.title to get query string from the
+            // Request and consider it as condition for findAll() method.
+            };
+
+        // Retrieve a single object
+            exports.findOne = (req, res) => {
+                //get the id params
+                const id = req.params.id;
+
+                //invoke access database
+                Tutorial.findByPk(id)
+                    .then((data) => {
+                    res.send(data);
+                    })
+                    .catch((err) => {
+                    res.status(500).send({
+                        message: "",
+                    });
+                    });
+            };
+
+                
+        // Update an object
+            exports.update = (req, res) => {
+            //get the id params
+            const id = req.params.id;
+
+            ///invokle database access
+            Tutorial.update(req.body, { where: { id: id } })
+                .then((num) => {
+                if (num == 1) {
+                    res.send({
+                    message: "Tutorial was updated successfully",
+                    });
+                } else {
+                    res.send({
+                    message: `Cannot update tutorial with id=${id}.\n
+                                Maybe tutorial was not found or req.body is empty!`,
+                    });
+                }
+                })
+                .catch((err) => {
+                res.status(500).send({
+                    message: "Error updating tutorial with id" + id,
+                });
+                });
+            };
+
+        // Delete an object
+            exports.delete = (req, res) => {
+            //get the id params
+            const id = req.params.id;
+
+            ///invokle database access
+            Tutorial.destroy({ where: { id: id } })
+                .then((num) => {
+                if (num == 1) {
+                    res.send({
+                    message: "Tutorial was deleted successfully",
+                    });
+                } else {
+                    res.send({
+                    message: `Cannot delete tutorial with id=${id}.\n
+                                Maybe tutorial was not found or req.body is empty!`,
+                    });
+                }
+                })
+                .catch((err) => {
+                res.status(500).send({
+                    message: "Error deleting tutorial with id" + id,
+                });
+                });
+            };
+ 
+        // Delete all objects
+            exports.deleteAll = (req, res) => {
+            //invoking database delete all
+            Tutorial.destroy({ where: {}, truncate: false }).then((nums) => {
+                res
+                .send({
+                    message: `${nums} tutorials were deleted successfully`,
+                })
+                .catch((err) => {
+                    res.status(500).send({
+                    message:
+                        err.message || "Some error occurred while removing all tutorials.",
+                    });
+                });
+            });
+            };
+
+        // Find all objects by condition
+            exports.findAllPublished = (req, res) => {
+            //invoking database to find all published
+            Tutorial.findAll({ where: { published: true } })
+                .then((data) => {
+                res.send(data);
+                })
+                .catch((err) => {
+                res.status(500).send({
+                    message:
+                    err.message || "Some error occurred while retrieving tutorials.",
+                });
+                });
+            };
+
+---------------------------------------------------------------------------------------------
+
+Define Routes
+    When a client sends request for an endpoint using HTTP request (GET, POST, PUT, DELETE), we need to determine how the server will reponse by setting up the routes.
+
+    These are our routes:
+
+        /api/tutorials: GET, POST, DELETE
+        /api/tutorials/:id: GET, PUT, DELETE
+        /api/tutorials/published: GET
+        Create a turorial.routes.js inside app/routes folder with content like this:
+
+    // module export to app
+        module.exports = (app) => {
+            //invoke controller
+            const tutorials = require("../controllers/tutorial.controller.js");
+
+            //invoking express router
+            var router = require("express").Router();
+
+            // Create a new Tutorial
+            router.post("/", tutorials.create);
+
+            // Retrieve all Tutorials
+            router.get("/", tutorials.findAll);
+
+            // Retrieve Tutorial by id
+            router.get("/:id", tutorials.findOne);
+
+            // Update Tutorial by id
+            router.put("/:id", tutorials.update);
+
+            // Delete Tutorial by id
+            router.delete("/:id", tutorials.delete);
+    
+            // Delete all tutorial
+            router.deleteAll("/", tutorials.deleteAll);
+
+            // Retrieve published
+            router.get("/published", tutorials.findAllPublished);
+
+
+            //invoking addition on URL
+            app.use("/api/tutorials", router);
+            
+        };
+
+    // You can see that we use a controller from /controllers/tutorial.controller.js.
+    // We also need to include routes in server.js (right before app.listen()):
+    //     require("./app/routes/turorial.routes")(app);
+
+---------------------------------------------------------------------------------------------
+
+create the database on MySQL
+
+    open MySQL then click + icon,
+    Connection name could be any then click ok,
+    then default sys schema is created,
+    now click add schema icon then input Name,
+    Name should be the same to the name on db.config.js DB name
+
+---------------------------------------------------------------------------------------------
+
+upon running on terminal :
+
+    C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql>node server
+    (node:7344) [SEQUELIZE0004] DeprecationWarning: A boolean value was passed to options.operatorsAliases. This is a no-op with v5 and should be removed.
+    Server is runnong on port 8080
+    Executing (default): DROP TABLE IF EXISTS `tutorials`;
+    Executing (default): CREATE TABLE IF NOT EXISTS `tutorials` (`id` INTEGER NOT NULL auto_increment , `title` VARCHAR(255), `description` VARCHAR(255), `published` TINYINT(1), `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB;
+    Executing (default): DROP TABLE IF EXISTS `tutorials`;
+    Executing (default): SHOW INDEX FROM `tutorials`
+    Executing (default): CREATE TABLE IF NOT EXISTS `tutorials` (`id` INTEGER NOT NULL auto_increment , `title` VARCHAR(255), `description` VARCHAR(255), `published` TINYINT(1), `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL, PRIMARY KEY (`id`)) ENGINE=InnoDB;
+    Unhandled rejection SequelizeDatabaseError: Table 'tutorialDB.tutorials' doesn't exist
+        at Query.formatError (C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql\node_modules\sequelize\lib\dialects\mysql\query.js:244:16)
+        at Query.handler [as onResult] (C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql\node_modules\sequelize\lib\dialects\mysql\query.js:51:23)
+        at Query.execute (C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql\node_modules\mysql2\lib\commands\command.js:30:14)
+        at Connection.handlePacket (C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql\node_modules\mysql2\lib\connection.js:417:32)
+        at PacketParser.onPacket (C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql\node_modules\mysql2\lib\connection.js:75:12)
+        at PacketParser.executeStart (C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql\node_modules\mysql2\lib\packet_parser.js:75:16)
+        at Socket.<anonymous> (C:\Users\donat\Documents\react_hooks_axios_routing_node_express_sequelize_MySQL\node-express-sequelize-mysql\node_modules\mysql2\lib\connection.js:82:25)
+        at Socket.emit (events.js:210:5)
+        at addChunk (_stream_readable.js:308:12)
+        at readableAddChunk (_stream_readable.js:289:11)
+        at Socket.Readable.push (_stream_readable.js:223:10)
+        at TCP.onStreamRead (internal/stream_base_commons.js:182:23)
+
+    Executing (default): SHOW INDEX FROM `tutorials`
+    Drop and re-sync db.
+
+    alos notice that the table will be created on MySQL
+
+---------------------------------------------------------------------------------------------
+
+testing the API on Postman
+
+    GET     http://localhost:8080/api/tutorials 
+        
+        Terminal Output:
+            Executing (default): SELECT `id`, `title`, `description`, `published`, `createdAt`, `updatedAt` FROM `tutorials` AS `tutorial`;
+
+        [
+            {
+                "id": 1,
+                "title": "tutorial1",
+                "description": null,
+                "published": false,
+                "createdAt": "2020-05-10T10:19:05.000Z",
+                "updatedAt": "2020-05-10T10:19:05.000Z"
+            }
+        ]
+
+    GET     http://localhost:8080/api/tutorials?title=try
+
+        Terminal output :
+            Executing (default): SELECT `id`, `title`, `description`, `published`, `createdAt`, `updatedAt` FROM `tutorials` AS `tutorial` WHERE `tutorial`.`title` LIKE '%try%';
+
+        [
+            {
+                "id": 3,
+                "title": "try",
+                "description": "description4",
+                "published": false,
+                "createdAt": "2020-05-10T11:08:28.000Z",
+                "updatedAt": "2020-05-10T11:08:28.000Z"
+            }
+        ]
+
+    POST    http://localhost:8080/api/tutorials
+        
+        Terminal Output:
+            Executing (default): INSERT INTO `tutorials` (`id`,`title`,`published`,`createdAt`,`updatedAt`) VALUES (DEFAULT,?,?,?,?);
+
+        {
+            "id": 1,
+            "title": "tutorial1",
+            "published": false,
+            "updatedAt": "2020-05-10T10:14:40.622Z",
+            "createdAt": "2020-05-10T10:14:40.622Z"
+        }
+
+    GET     http://localhost:8080/api/tutorials/1
+
+        Terminal Output:
+            Executing (default): SELECT `id`, `title`, `description`, `published`, `createdAt`, `updatedAt` FROM `tutorials` AS `tutorial` WHERE `tutorial`.`id` = '1';
+
+        {
+            "id": 1,
+            "title": "tutorial1",
+            "description": null,
+            "published": false,
+            "createdAt": "2020-05-10T10:19:05.000Z",
+            "updatedAt": "2020-05-10T10:19:05.000Z"
+        }
+
+    PUT     http://localhost:8080/api/tutorials/1
+
+        Terminal Output:
+            Executing (default): UPDATE `tutorials` SET `published`=?,`updatedAt`=? WHERE `id` = ?
+
+        {
+            "message": "Tutorial was updated successfully"
+        }
+
+        -------------------------------------------------
+
+        put request body
+        {
+            "title": "tutorial34",
+            "description": "description34"
+        }
+
+    DELETE  http://localhost:8080/api/tutorials/1
+
+        Terminal output :
+            Executing (default): DELETE FROM `tutorials` WHERE `id` = '1'
+
+        {
+            "message": "Tutorial was deleted successfully"
+        }
+
+    DELETE  http://localhost:8080/api/tutorials/
+
+        Terminal output :
+            Executing (default): DELETE FROM `tutorials`
+
+        {
+            "message": "3 tutorials were deleted successfully"
+        }
+
+---------------------------------------------------------------------------------------------
+
+GetAllPublished is not working because of the below retason :
+
+    (node:20372) [SEQUELIZE0004] DeprecationWarning: A boolean value was passed to options.operatorsAliases. 
+    This is a no-op with v5 and should be removed.
+
+    
