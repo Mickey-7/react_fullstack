@@ -1,0 +1,195 @@
+referrence : https://bezkoder.com/spring-boot-jpa-crud-rest-api/
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+domain
+    - @Entity annotation indicates that the class is a persistent Java class.
+    – @Table annotation provides the table that maps this entity.
+    – @Id annotation is for the primary key.
+    – @GeneratedValue annotation is used to define generation strategy for the primary key.
+       GenerationType.AUTO means Auto Increment field.
+    – @Column annotation is used to define the column in database that maps annotated field.
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+repository
+    - @Repository
+    - extends JpaRepository<Tutorials, Long>
+
+    Now we can use JpaRepository’s methods: save(), findOne(), findById(), findAll(), count(), delete(), deleteById()… without implementing these methods.
+
+    We also define custom finder methods:
+    – findByPublished(): returns all Tutorials with published having value as input published.
+    – findByTitleContaining(): returns all Tutorials which title contains input title.
+
+    The implementation is plugged in by Spring Data JPA automatically.
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+controller
+    @RestController
+    @RequestMapping("/api")
+    @CrossOrigin(origins="*")
+    @Autowired
+    @PostMapping
+        @RequestBody
+    @GetMapping
+        @PathVariable
+        @RequestParam
+
+    @CrossOrigin is for configuring allowed origins.
+    – @RestController annotation is used to define a controller and to indicate 
+       that the return value of the methods should be be bound to the web response body.
+    – @RequestMapping("/api") declares that all Apis’ url in the controller will start with /api.
+    – We use @Autowired to inject TutorialRepository bean to local variable.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
+    Methods	    Urls	                            Actions
+    POST	    /api/tutorials	                    create new Tutorial
+    GET	        /api/tutorials	                    retrieve all Tutorials
+    GET	        /api/tutorials?title=[keyword]	    find all Tutorials which title contains keyword
+    GET	        /api/tutorials/:id	                retrieve a Tutorial by :id
+    PUT	        /api/tutorials/:id	                update a Tutorial by :id
+    DELETE	    /api/tutorials/:id	                delete a Tutorial by :id
+    DELETE	    /api/tutorials	                    delete all Tutorials
+    GET	        /api/tutorials/published	        find all published Tutorials
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+POST	    /api/tutorials	                    create new Tutorial
+
+    if we have ResponseEntity<data_type - Class> as output on the method :
+        public ResponseEntity<data_type - Class> createTutorial(Tutorial tutorial){...
+    we should return it with :
+        return new ResponseEntity(variable w/data type - Class, HttpStatus.STATUS)
+    
+    see below for the actual implementation :
+        @PostMapping("/tutorials")
+        //note that we use ResponseEntity (with data type - Tutorial) on the output
+        public ResponseEntity<Tutorial> createTutorial(@RequestBody Tutorial tutorial){
+            //need to create tutorialSave variable with Tutorial data type then set to repository to save
+            Tutorial tutorialSave = tutorialRepository.save(new Tutorial(tutorial.getTitle(), tutorial.getDescription(),false));
+            //note that when we return, we use new ResponseEntity(variable w/data type - Tutorial, HttpStatus.STATUS)
+            return new ResponseEntity<>(tutorialSave, HttpStatus.CREATED);
+        }
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+GET	        /api/tutorials	                    retrieve all Tutorials
+GET	        /api/tutorials?title=[keyword]	    find all Tutorials which title contains keyword
+
+    we will make single method fo the two request above and also handle if no content found
+
+        @GetMapping("/tutorials")
+        public ResponseEntity<List<Tutorial>> getAllTutorials(@RequestParam(required = false) String title){
+            //we need to set (required = false) on the input parameter after @RequestParam
+            //as its default value is true so it will require the title
+
+            //need to create blank ArrayList of Tutorial
+            List<Tutorial> tutorials = new ArrayList<>();
+
+            //then add all then repository content with findAll()
+            //to the created blank tutorials ArrayList if no title found
+            if (title==null){
+                tutorials.addAll(tutorialRepository.findAll());
+            }else {
+                //otherwise, set it to repository with findByTitleContaining() method
+                tutorials.addAll(tutorialRepository.findByTitleContaining(title));
+            }
+
+            //handle if no tutorials found
+            if (tutorials.isEmpty()){
+                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            }
+
+            return new ResponseEntity<>(tutorials, HttpStatus.OK);
+        }
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+GET	        /api/tutorials/:id	                retrieve a Tutorial by :id
+
+    since .findById() has optional return, we will make Optional<Tutorial> for variable tutorial
+    we also need to check if optional tutorial is present, tutorial.isPresent()
+    in return, we need to use tutorial.get() to get the optional tutorial we also handle if the id is not found
+
+        @GetMapping("/tutorials/{id}")
+        public ResponseEntity<Tutorial> getTutorialById(@PathVariable Long id){
+            //since .findById() has optional return we will use Optional<Tutorial>
+            Optional<Tutorial> tutorial = tutorialRepository.findById(id);
+            //since we use optional , we need to check if its present .isPresent()
+            if (tutorial.isPresent()){
+                //since we use .isPresent(), we need to use get method .get()
+                return new ResponseEntity<>(tutorial.get(), HttpStatus.OK);
+            }else{
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+        }
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+PUT	        /api/tutorials/:id	                update a Tutorial by :id
+
+    we will still use Optional<Tutorial> on .findById() for compatibility
+    then use .isPresent() to check and create new Tutorial then set it with .get()
+    and use setter on new Tutorial to update the fields value of the chosen Tutorial 
+    then return new ResponseEntity with save to repository and HttpStatus inside
+    otherwise handle return not found
+
+        @PutMapping("/tutorials/{id}")
+        public ResponseEntity<Tutorial> updateTutorial(@PathVariable Long id, @RequestBody Tutorial tutorial){
+            Optional<Tutorial> tutorialUpdate = tutorialRepository.findById(id);
+            if (tutorialUpdate.isPresent()){
+                //then create new Tutorial then set it with tutorialUpdate by using tutorialUpdate.get()
+                Tutorial tutorialUpdated = tutorialUpdate.get();
+                tutorialUpdated.setTitle(tutorial.getTitle());
+                tutorialUpdated.setDescription(tutorial.getDescription());
+                tutorialUpdated.setPublished(tutorial.getPublished());
+                return new ResponseEntity<>(tutorialRepository.save(tutorialUpdated), HttpStatus.OK);
+            }else {
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+        }
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+DELETE	    /api/tutorials/:id	                delete a Tutorial by :id
+DELETE	    /api/tutorials	                    delete all Tutorials
+
+    same output on both method :
+        ResponseEntity<HttpStatus>
+    same return on both method :
+        return new ResponseEntity<HttpStatus.NO_CONTENT>
+
+            @DeleteMapping("/tutorials/{id}")
+            public ResponseEntity<HttpStatus> deleteTutorial(@PathVariable Long id){
+                tutorialRepository.deleteById(id);
+                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            }
+
+            @DeleteMapping("/tutorials")
+            public ResponseEntity<HttpStatus> deleteAllTutorials(){
+                tutorialRepository.deleteAll();
+                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            }
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+GET	        /api/tutorials/published	        find all published Tutorials
+
+    we will handle if published id empty or not
+
+        @GetMapping("/tutorials/published")
+        public ResponseEntity<List<Tutorial>> findByPublished(){
+            List<Tutorial> publishedTutorial = tutorialRepository.findByPublished(true);
+            
+            if (publishedTutorial.isEmpty()){
+                return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            }else {
+                return new ResponseEntity<>(publishedTutorial,HttpStatus.OK);
+            }
+            
+        }
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------

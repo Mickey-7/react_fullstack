@@ -1,0 +1,757 @@
+reference : https://bezkoder.com/react-hooks-crud-axios-api/
+
+---------------------------------------------------------------------------------------------------------------
+
+Visual Studio Code - split horizontally
+    View -> Edit Layout -> Split Down
+
+---------------------------------------------------------------------------------------------------------------
+
+routing -> npm i react-router-dom
+
+axios -> npm i axios
+    https://www.npmjs.com/package/axios
+
+---------------------------------------------------------------------------------------------------------------
+
+data flow : 
+
+    components (invokes method from service) 
+        |
+        |
+        ---> service (invokes axios) 
+            |
+            |
+            ----> axios (invoked URL of controller backend API & JSON headers) 
+
+---------------------------------------------------------------------------------------------------------------
+
+App.js
+    import and invoke BrowserRouter , Link, Route & the components
+        return (
+        <BrowserRouter>
+            <ul>
+                <li>
+                <Link to="/tutorialList">Tutorial List</Link>
+                </li>
+                <li>
+                <Link to="/addTutorial">Add Tutorial</Link>
+                </li>
+            </ul>
+            <br></br>
+            <br></br>
+            <Route path={'/tutorialList'}>
+                <TutorialList/>
+            </Route>  
+            <Route path={'/addTutorial'}>
+                <AddTutorials/>
+            </Route>  
+            <Route path={'/editTutorial/:id'}>
+                <EditTutorial/>
+            </Route>    
+        </BrowserRouter>
+        );
+
+    note : that the :id param is only apllicable to Route and not on the Link
+
+App.css
+    to remove dots on ul
+        ul {
+            list-style-type : none
+        }
+    to make li next to each other starting from left
+        li {
+            float : left
+            padding : 0px 10px;
+        }
+
+---------------------------------------------------------------------------------------------------------------
+
+axios
+    http-common.js
+        snippet : imp + tab
+        import axios from 'axios';
+
+        snippet : exp + tab
+        export default axios.create({
+            baseULR : "http://localhost:8080/api",
+            headers : {
+                "Content-type" : "application/json"
+            }
+        });
+
+    – http-common.js initializes axios with HTTP base Url and headers.
+
+---------------------------------------------------------------------------------------------------------------
+
+service
+    TutorialService.js
+        snippet : imp + tab
+        import the file in axios
+            import http from '../axios/http-common'
+
+        snippet : nfn
+        create all the methods needed (sample only)
+            const create = (data) => {
+                return http.post("/tutorials",data);
+            }
+            const update = (id,data) => {
+                return http.put(`/tutorials/${id}`,data);
+            }
+            const findByTitle = (title) => {
+                return http.get(`/tutorials?title=${title}`);
+            }
+            ........
+
+        snippet : exp + tab
+        export all the created methods
+            export default {
+                create,
+                update,
+                findByTitle,
+                .......
+            }
+
+    – TutorialDataService has functions for sending HTTP requests to the Apis.
+
+---------------------------------------------------------------------------------------------------------------
+
+components
+
+    AddTutorial.js
+        snippet : rafce
+        
+        First, we define and set initial state: tutorial & submitted.
+            //create blank initialState
+                const initialState = {
+                    id : null,
+                    title : "",
+                    description : "",
+                    published : false
+                }
+            // snippet : useS
+                const [tutorial, setTutorial] = useState(initialState);
+                const [submitted, setSubmitted] = useState(false);
+
+        Next, we create handleInputChange() function to track the values of the input and set that state for changes.
+            //Invoking the name & value property to get input field values then setting the value to blank initial state
+                const handleInputChange = (event) => {
+                    //snippet : dob
+                    const {name,value} = event.target;
+
+                    setTutorial({...tutorial, [name]: value});
+                }
+
+        We also have a function to get tutorial state and send the POST request to the Web API. 
+        It calls TutorialDataService.create() method.
+            //snippet : nfn
+            const saveTutorial = () => {
+                var data = {title : tutorial.title, description : tutorial.description};
+
+                //invoking service
+                TutorialService.create(data)
+                .then(response  => {
+                    //set tutorial from blank to input field values
+                    setTutorial({
+                        id : response.data.id,
+                        title : response.data.title,
+                        description : response.data.description,
+                        published : response.data.published
+                    })
+                    setSubmitted(true);
+                    // snippet : cl
+                    console.log(response.data);
+                })
+                .catch(e => {
+                    console.log(e);
+                }) 
+            }
+
+        Setting for the new tutorial
+            // snippet : nfn
+            const newTutorial = () => {
+                setTutorial(initialState);
+                setSubmitted(false);
+            }
+
+        For return, we check the submitted state, if it is true, we show Add button for creating new Tutorial again. 
+        Otherwise, a Form with Submit button will display.
+            return (
+                <div>
+                    <h3>Add Tutorial</h3>
+                    {
+                        submitted ? (
+                            <div>
+                                <h3>Successfully Submitted!</h3>
+                                <button onClick={newTutorial}>
+                                    Add New Tutorial
+                                </button>
+                            </div>
+                        ):(
+                            <div>
+                                <h3></h3>
+                                <label>Title :</label><br></br>
+                                <input 
+                                    name="title"
+                                    value={tutorial.title}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter Title"
+                                    type="text"
+                                />
+                                <br></br>
+                                <label>Title :</label><br></br>
+                                <input 
+                                    name="description"
+                                    value={tutorial.description}
+                                    onChange={handleInputChange}
+                                    placeholder="Enter Description"
+                                    type="text"
+                                />
+                                <br></br>
+                                <button onClick={saveTutorial}>
+                                    Submit Tutorial
+                                </button>
+                            </div>
+                        )
+                    }
+                </div>
+            )
+
+---------------------------------------------------------------------------------------------------------------
+    
+    TutorialList.js
+        snippet : rafce
+
+        List of Objects Component
+        There will be:
+            a search bar for finding Tutorials by title.
+            a tutorials array displayed as a list on the left.
+            a selected Tutorial which is shown on the right.
+
+        So we will have following state:
+            searchTitle
+            tutorials
+            currentTutorial and currentIndex
+
+                const [searchTitle, setSearchTitle] = useState("");
+                const [tutorials, setTutorials] = useState([]);
+                //for the current selected tutorail to be dited
+                const [currentTutorial, setCurrentTutorial] = useState(null)
+                //for the position based on the tutorials DOM rendered list
+                const [currentIndex, setCurrentIndex] = useState(-1)
+
+        We also need to use 3 TutorialDataService functions:
+            getAll()
+            removeAll()
+            findByTitle()
+
+        We’re gonna use the Effect Hook: 
+            useEffect() to fetch the data from the Web API. 
+        This Hook tells React that the component needs to do something after render or performing the DOM updates. 
+        In this effect, we perform data fetching from API.
+
+        get search value and set it to searchTitle state
+            //get search value and set it to searchTitle state
+            // snippet : nfn
+            const handleSearchChange = (event) => {
+                // snippet : dob
+                //storing the type search value
+                const searchTitle = event.target.value
+                //invoking searchTitle state
+                setSearchTitle(searchTitle);
+                console.log(searchTitle);
+            }
+
+        then invoke the service and set the tutorial list from searchTitle
+            //invoking the service
+            const findByTitle = () => {
+                console.log(searchTitle);
+                TutorialService.findByTitle(searchTitle)
+                .then( response => {
+                    //setting the tutorial list from searchTitle  
+                    setTutorials(response.data)
+                    console.log(response.data);
+                })
+                .catch(e=>{
+                    console.log(e);
+                })
+            }
+
+        create retrive tutorial list method (from all - default)
+            // It allows us to run a function based on whether something changed.
+            //and retrive values from the list
+            //snippet : useE
+            useEffect(() => {
+                retriveTutorials();
+            },[])
+
+            //create retrive tutorial list method
+            //snippert : nfn
+            const retriveTutorials = () => {
+                //invoking the service
+                TutorialService.getAll()
+                .then(response => {
+                    //setting the tutorials list from all
+                    console.log(response);
+                    console.log(response.data);
+                    setTutorials(response.data)
+                })
+                .catch(e=>{
+                    console.log(e);
+                })
+            }
+    
+        invoking service to remove all
+            // invoking service to remove all
+            //snippet : nfn
+            const removeAllTutorials = () => {
+                console.log("remove all");
+                TutorialService.removeAll()
+                .then(response => {
+                    console.log(response.data);
+                    //invoke refresh method 
+                    refreshList();
+                })
+                .catch(e=>{
+                    console.log(e);
+                })
+            }
+
+        create refresh method
+            // create refresh method
+            const refreshList = () => {
+                console.log("refresh"); 
+                retriveTutorials();
+                setCurrentTutorial(null);
+                setCurrentIndex(-1);
+            }
+
+        create a method that will display the selected item to be edited :
+            //method to get the active selected tutorial for editing
+            const setActiveTutorial = (tutorial) => {
+                console.log(tutorial);
+                setCurrentTutorial(tutorial);
+                setCurrentIndex(tutorial.id);
+            }
+
+        on return, we will render the list and will show the selected item on the list if there is any selected
+        <div>
+            <h3>Tutorial List</h3>
+
+            {/* for search Title */}
+            <input
+                value={searchTitle}
+                onChange={handleSearchChange}
+                placeholder="Search by Title"
+                type="text"
+            />
+            <button onClick={findByTitle}>
+                Search
+            </button>
+
+            {/* for displatying tutorials */}
+            <ul>
+                {
+                    tutorials.map((tutorial,index) => (
+                        // for active seletion
+                        <li onClick={setActiveTutorial(tutorial,index)} key={index}>
+                            {tutorial.title}
+                        </li>
+                    ))
+                }
+            </ul>
+
+            {/* for remove all */}
+            <button onClick={removeAllTutorials}>
+                Remove All
+            </button>
+
+            {/* for active selected tutorial rendering */}
+            {
+                currentTutorial ? (
+                    <div>
+                        <h3>Selected Tutorial</h3>
+                        <label>Title : </label>
+                        <div>{currentTutorial.title}</div>
+                        <label>Description : </label>
+                        <div>{currentTutorial.description}</div>
+                        <label>Status : </label>
+                        <div>{currentTutorial.published? "Published" : "Pending"}</div>
+                        //invoking EditTutorial
+                        <Link
+                            to={"/editTutorials/"+currentTutorial.id}
+                        >
+                            Edit
+                        </Link>
+                    </div>
+
+                ):(
+                    <div>
+
+                    <br></br>
+                    <p>Please click on a Tutorial </p>
+
+                    </div>
+                )
+            } 
+        </div>
+
+        If you click on Edit button of any Tutorial, the app will direct you to Tutorial page.
+        We use React Router Link for accessing that page with url: /tutorials/:id.
+
+---------------------------------------------------------------------------------------------------------------
+
+    EditTutorial.js
+        snippet : rafce
+
+        Object details Component
+        For getting data & update, delete the Tutorial, this component will use 3 TutorialDataService functions:
+            get()
+            update()
+            remove()
+
+        We also use the Effect Hook useEffect() to get Tutorial by id in the URL.
+
+        useState for storage of selected tutorial item
+            //blank currentTutorial for the selected item
+            const initialState =  {
+                id:null,
+                title:"",
+                description:"",
+                published:false,
+            }
+            const [currentTutorial, setCurrentTutorial] = useState(initialState);
+            const [message, setMessage] = useState("")
+
+        for us to get the selected tutorial of TutorialList.js, we need to use useParams() and make it as an input parameter 
+        to the getTutorialById method and useEffect()
+            //getTutorialById method to invoke service to get tutorial by id
+            const getTutorial = (id) => {
+                console.log(id);
+                TutorialService.get(id)
+                .then(response => {
+                    console.log(response);
+                    ///set the selected tutorial to the selected tutorial
+                    setCurrentTutorial(response.data)
+                    console.log(response.data);
+                })
+                .catch(e=>{
+                    console.log(e);
+                })
+            }
+
+            //useParams() to getTutorialById
+            let {id} = useParams();
+            console.log(id);
+
+            //useEffect to get the selected item as props from TutorialList
+            useEffect(()=>{
+                //check if id is match
+                getTutorial(id)
+            },[id])
+
+        for us to toggle the status (from unpublished to publsihed & vice versa)
+            //setting the currentTutorial to be published and invoking update service
+            const updatePublished = (status) => {
+                console.log(status);
+                var data = {
+                    id: currentTutorial.id,
+                    title : currentTutorial.title,
+                    description : currentTutorial.description,
+                    published : status
+                }
+                console.log(data);
+
+                    //invoking update service to published
+                TutorialService.update(currentTutorial.id,data)
+                    .then(response => {
+                        console.log(response.data);
+                        //set current Tutorial published status
+                        setCurrentTutorial({...currentTutorial,published:status})
+                    })
+                    .catch(e=>{
+                        console.log(e);
+                    })
+            }
+
+        method for delete
+            const deleteTuts = (id) => { 
+                    //invoking service
+                    TutorialService.remove(id)
+                        .then(response => {
+                            console.log(response.data);
+                            //clear inputs after delete
+                            setCurrentTutorial(initialState)
+                        })
+                        .catch(e=>{
+                            console.log(e);
+                        })
+            }
+
+        for update : handle input changes then method invoking the update from service
+            //to handle changes on input and set the value to currentTutorial
+            const handleInputChange = (event) => {
+                //no need to put value after target as we will not able to make edit on it..
+                //console will only output undefined on onChange event!!!!!!!!
+                //this took many fucking hours!!!!!!!
+                const {name,value} = event.target;
+                setCurrentTutorial({...currentTutorial,[name]:value})
+                console.log(value);
+            }
+
+            //methos for update
+            const update = (id,data) => {
+                //invoke service
+                TutorialService.update(id,data)
+                .then(response=>{
+                    console.log(data);
+                    console.log(response.data);
+                    //set message after update
+                    setMessage("The tutorial was updated successfully")
+                    console.log(message);
+                
+                }) 
+                .catch(e=>{
+                    console.log(e);
+                })
+            }
+
+        on return, if there is selected currentTutorial we will render its values on the input fields
+            {
+                // displaying the selected tutorial
+                currentTutorial? (
+                    <div>
+                        <label><strong>Title : </strong></label><br></br>
+                        <input
+                            name="title"
+                            value={currentTutorial.title}
+                            onChange={handleInputChange}
+                            type="text"
+                        /><br></br>
+                        <label><strong>Description : </strong></label><br></br>
+                        <input
+                            name="description"
+                            value={currentTutorial.description}
+                            onChange={handleInputChange}
+                            type="text"
+                        /><br></br>
+                        <label><strong>Status : </strong></label>
+                        {
+                            currentTutorial.published? "Published":"Pending"
+                        }
+                        <br></br>
+                        {/* making the tutorial Unpublished/Published */}
+                        {
+                            currentTutorial.published?(
+                                <button onClick={() => updatePublished(false)}> 
+                                    Unpublished
+                                </button>
+                            ):(
+                                <button onClick={() => updatePublished(true)}>
+                                    Published
+                                </button>
+                            )
+                        }
+
+                        <br></br>
+                        {/* for delete item */}
+                        <button onClick={()=>deleteTuts(currentTutorial.id)}>
+                            Delete
+                        </button>
+                        <br></br>
+                        
+                        {/* for overall update */}
+                        <button onClick={()=>update(currentTutorial.id,currentTutorial)}>
+                            Update 
+                        </button>
+                        <p>{message}</p>
+
+                    </div>                        
+                ):(
+                    <div>
+                        <p>Please select on a TutorialList</p>    
+                    </div>
+                )
+            }
+
+    NOTE : 
+        we use onChange={function_name_that_hanldes_change_on_input}  : simple function for get input values
+            onChange = {function_name}
+        we use onClick={()=> function_name_that_passes_any_parameter} : arrow function for params
+            onClick = {()=> function_name}
+
+---------------------------------------------------------------------------------------------------------------
+
+error encountered :
+
+    Failed to compile.
+    ./src/components/TutorialList.js
+    Line 100:25:  Expected an assignment or function call and instead saw an expression  no-unused-expressions
+    Search for the keywords to learn more about each error.
+
+        solutinon : must be => () instead of => {}
+
+            .map((x,y) => (
+
+            ))
+
+    ---------------------------------------------------------------------------------------------------------------
+
+    no display on the web page when retrieving the data... 
+    
+        found out that the method below : must have .data 
+            //create retrive tutorial list method
+            //snippert : nfn
+            const retriveTutorials = () => {
+
+                //invoking the service
+                TutorialService.getAll()
+
+                .then(response => {
+                    //setting the tutorials list from all
+
+        58            console.log(response);-----------------------------------------------------------------------------------------
+        59            console.log(response.data);------------------------------------------------------------                       |
+                                                                                                            |                       |
+                    setTutorials(response.data)                                                             |                       |
+                })                                                                                          |                       |
+                .catch(e=>{                                                                                 |                       |
+                    console.log(e);                                                                         |                       |
+                })                                                                                          |                       |
+            }                                                                                               |                       |
+                                                                                                           \|/                      |
+                                                                                                    TutorialList.js:59              |
+        (4) [{…}, {…}, {…}, {…}]                                                                                                    |
+        0: {id: 1, title: "firstName1", description: "lastName2", published: false}                                                 |
+        1: {id: 2, title: "firstName1", description: "lastName2", published: false}                                                 |
+        2: {id: 3, title: "firstName1", description: "lastName2", published: false}                                                 |
+        3: {id: 4, title: "kobe", description: "qwerty", published: false}                                                          |
+        length: 4                                                                                                                   |
+        __proto__: Array(0)                                                                                                         |   
+                                                                                                            -------------------------
+                                                                                                            |    
+                                                                                                           \|/
+                                                                                                    TutorialList.js:58
+        {data: Array(4), status: 200, statusText: "", headers: {…}, config: {…}, …}
+        config: {url: "/tutorials", method: "get", headers: {…}, baseURL: "http://localhost:8080/api", transformRequest: Array(1), …}
+        data: (4) [{…}, {…}, {…}, {…}]
+        headers: {content-type: "application/json"}
+        request: XMLHttpRequest {readyState: 4, timeout: 0, withCredentials: false, upload: XMLHttpRequestUpload, onreadystatechange: ƒ, …}
+        status: 200
+        statusText: ""
+        __proto__: Object
+
+    ---------------------------------------------------------------------------------------------------------------
+
+    still on rendering but after the remove all function causes error below :
+
+        Uncaught TypeError:                                     TutorialList.js:113 
+        tutorials.map is not a function :  at TutorialList (TutorialList.js:113)
+    
+        solution :
+
+        from :
+        {
+            tutorials.map((tutorial) => (
+            <li onClick={() => setActiveTutorial(tutorial)} key={tutorial.id}>
+                {tutorial.title}
+            </li>                  
+        ))}  
+
+        to :
+        {
+            tutorials && tutorials.map((tutorial) => (
+            <li onClick={() => setActiveTutorial(tutorial)} key={tutorial.id}>
+                {tutorial.title}
+            </li>                  
+        ))}  
+
+    ---------------------------------------------------------------------------------------------------------------
+
+    to be able to pass the id of selected item from TutorialList.js to EditTutorial.js,
+    
+        <Link to{"/editTutorial/"+currentTutorial.id}>
+            Edit
+        </Link>
+
+    we use useParams() on the useEfffect() & method we will make and invoike the update service to get TuotrialById on EditTutorial.js,
+
+        //useParams() to getTutorialById
+        let {id} = useParams();
+        console.log(id);
+
+        //useEffect to get the selected item as props from TutorialList
+        useEffect(()=>{
+            //check if id is match
+            getTutorial(id)
+        },[id])
+
+        //getTutorialById method to invoke service to get tutorial by id
+        const getTutorial = (id) => {
+            console.log(id);
+            TutorialService.get(id)
+            .then(response => {
+                console.log(response);
+                ///set the selected tutorial to the selected tutorial
+                setCurrentTutorial(response.data)
+                console.log(response.data);
+            })
+            .catch(e=>{
+                console.log(e);
+            })
+        }
+
+    ---------------------------------------------------------------------------------------------------------------
+
+    onChange property on input field doesn't change when typing something,
+
+        9 undefined         EditTutorial.js:87 
+    
+    typed 9 characters alrady on inptu field but its not changed
+    bug was because on the event.target.value from onChange property
+
+        <input
+            name="title"
+            value={currentTutorial.title}
+            onChange={handleInputChange}
+            type="text"
+        /><br></br>
+
+        //to handle changes on input and set the value to currentTutorial
+        const handleInputChange = (event) => {
+            //no need to put value after target as we will not able to make edit on it..
+            //console will only output undefined on onChange event!!!!!!!!
+            //this took many fucking hours!!!!!!!
+            const {name,value} = event.target.value;
+            setCurrentTutorial({...currentTutorial,[name]:value})
+            console.log(value);
+        }
+
+    solution : must be event.target only and not event.target.value!!!!!!!!
+
+        //to handle changes on input and set the value to currentTutorial
+        const handleInputChange = (event) => {
+            //no need to put value after target as we will not able to make edit on it..
+            //console will only output undefined on onChange event!!!!!!!!
+            //this took many fucking hours!!!!!!!
+            const {name,value} = event.target;
+            setCurrentTutorial({...currentTutorial,[name]:value})
+            console.log(value);
+        }
+
+---------------------------------------------------------------------------------------------------------------
+
+summary of function per component :
+
+    EditTutorial.js
+        -> remove by id
+        -> update selected item
+        -> updatePublished -> set published to true/false
+
+    TutorialList.js
+        -> searchTitle
+        -> get by Title
+        -> remove All
+        -> get All
+        -> select active item to be updated
+
