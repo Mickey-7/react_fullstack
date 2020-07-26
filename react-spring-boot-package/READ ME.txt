@@ -1,0 +1,499 @@
+reference : https://github.com/kantega/react-and-spring
+
+----------------------------------------------------------------------------------
+
+Goal:
+    Easily deploy to test and production environments
+    Frontend and backend in a single jar
+    Keep the benefits using the Create React App environment including:
+        Hot reload
+        Built in ES6 to ES5 transpiler
+        Optimized production build
+
+----------------------------------------------------------------------------------
+
+Getting started
+    First, create a spring boot project with https://start.spring.io.
+    Add the Web dependency.
+
+    Right now, there are no services in this app, so if you were to run it
+    and navigate to http://localhost:8080, you would only get a 404 page.
+    So let's add a controller called
+
+    @RestController
+    public class HelloController {
+        @GetMapping("/api/hello")
+        public String hello() {
+            return "Hello, the time at the server is now " + new Date() + "\n";
+        }
+    }
+
+----------------------------------------------------------------------------------
+
+Adding React
+    This section uses the tool npx, which is included with newer versions of npm.
+
+    Open terminal using IntelliJ.
+    Notice the default directory is on the current project.
+
+        npx create-react-app frontend
+
+----------------------------------------------------------------------------------
+
+Calling rest services in spring from React
+    Now we have a backend server in Spring Boot running at http://localhost:8080
+    and a frontend in React running at http://localhost:3000.
+
+    We'd like to be able to call services in the backend and display the results in the frontend.
+
+    In order to do this (and not get into trouble with any cross-origin requests (CORS))
+    we ask the frontend server to proxy any requests from :3000 to :8080.
+
+    According to the documentation you have to add a proxy entry to frontend/package.json.
+    This will ensure that the web server at :3000 proxies any requests to
+    http://localhost:3000/api/* to http://localhost:8080/api,
+    which will enable us to call the backend without running into any CORS issues.
+
+    Note that this is only useful during development.
+    In a test or production environment, we will solve this in a different way. Read on :)
+
+    frontend/package.json
+
+        {
+          "name": "frontend",
+          "version": "0.1.0",
+          "private": true,
+          "dependencies": {
+            "@testing-library/jest-dom": "^4.2.4",
+            "@testing-library/react": "^9.5.0",
+            "@testing-library/user-event": "^7.2.1",
+            "react": "^16.13.1",
+            "react-dom": "^16.13.1",
+            "react-scripts": "3.4.1"
+          },
+          "scripts": {
+            "start": "react-scripts start",
+            "build": "react-scripts build",
+            "test": "react-scripts test",
+            "eject": "react-scripts eject"
+          },
+          "eslintConfig": {
+            "extends": "react-app"
+          },
+          "browserslist": {
+            "production": [
+              ">0.2%",
+              "not dead",
+              "not op_mini all"
+            ],
+            "development": [
+              "last 1 chrome version",
+              "last 1 firefox version",
+              "last 1 safari version"
+            ]
+          },
+        //  added manually
+          "proxy": "http://localhost:8080"
+        }
+
+    Next, let's add a rest call to the frontend:
+
+    Open frontend/src/App.js and replace its contents with this:
+
+        function App() {
+            // snippet : useS
+            const [message, setMessage] = useState("")
+            // snippet : useE
+            useEffect(() => {
+                fetch("/api/hello")
+                .then(response => response.text())
+                .then(message => {
+                setMessage(message)
+                })
+            }, [])
+
+          return (
+            <div className="App">
+              <header className="App-header">
+                <img src={logo} className="App-logo" alt="logo" />
+                <p>
+                  Edit <code>src/App.js</code> and save to reload.
+                </p>
+                <a
+                  className="App-link"
+                  href="https://reactjs.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Learn React
+                </a>
+              <h3>{message}</h3>
+              </header>
+            </div>
+          );
+        }
+
+----------------------------------------------------------------------------------
+
+Packaging the React app with Spring Boot
+    We'd like to be able to publish one jar file to production,
+    and that jar file should contain both the backend and the frontend.
+
+    Spring Boot applications can serve static content if you put it
+    into the classes/public directory of the application jar file.
+
+    Create React App can build a static bundle for production by running npm build in the frontend directory.
+
+    To accomplish this, we have to do the following:
+
+        create a production build of the frontend
+        copy the production build into ${target/classes/public}
+
+    We'll use frontend-maven-plugin in step 1, and maven-antrun-plugin in step 2.
+
+    When we're done, we can just type $ mvn clean install and we'll end up
+    with a single jar file containing both the frontend and the backend.
+
+----------------------------------------------------------------------------------
+
+Run npm from maven
+    Add the following to pom.xml under /build/plugins:
+
+        <plugin>
+            <groupId>com.github.eirslett</groupId>
+            <artifactId>frontend-maven-plugin</artifactId>
+            <version>1.6</version>
+            <configuration>
+                <workingDirectory>frontend</workingDirectory>
+                <installDirectory>target</installDirectory>
+            </configuration>
+            <executions>
+                <execution>
+                    <id>install node and npm</id>
+                    <goals>
+                        <goal>install-node-and-npm</goal>
+                    </goals>
+                    <configuration>
+                        <nodeVersion>v8.9.4</nodeVersion>
+                        <npmVersion>5.6.0</npmVersion>
+                    </configuration>
+                </execution>
+                <execution>
+                    <id>npm install</id>
+                    <goals>
+                        <goal>npm</goal>
+                    </goals>
+                    <configuration>
+                        <arguments>install</arguments>
+                    </configuration>
+                </execution>
+                <execution>
+                    <id>npm run build</id>
+                    <goals>
+                        <goal>npm</goal>
+                    </goals>
+                    <configuration>
+                        <arguments>run build</arguments>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+
+     When you run mvn clean install, maven will install npm
+     and node locally and run npm build in the frontend directory.
+
+     -> click Maven on right side on the IntelliJ
+     -> click react-spring-boot-package
+     -> click Lifecycle
+     -> double click clean
+
+     "C:\Program Files\Java\jdk-13\bin\java.exe" -Dmaven.multiModuleProjectDirectory=C:\Users\donat\Downloads\react-spring-boot-package "-Dmaven.home=C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\plugins\maven\lib\maven3" "-Dclassworlds.conf=C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\plugins\maven\lib\maven3\bin\m2.conf" "-Dmaven.ext.class.path=C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\plugins\maven\lib\maven-event-listener.jar" "-javaagent:C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\lib\idea_rt.jar=63412:C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\bin" -Dfile.encoding=UTF-8 -classpath "C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\plugins\maven\lib\maven3\boot\plexus-classworlds-2.6.0.jar" org.codehaus.classworlds.Launcher -Didea.version2019.2.3 clean
+     [INFO] Scanning for projects...
+     [INFO]
+     [INFO] ---------------< com.example:react-spring-boot-package >----------------
+     [INFO] Building react-spring-boot-package 0.0.1-SNAPSHOT
+     [INFO] --------------------------------[ jar ]---------------------------------
+     [INFO]
+     [INFO] --- maven-clean-plugin:3.1.0:clean (default-clean) @ react-spring-boot-package ---
+     [INFO] ------------------------------------------------------------------------
+     [INFO] BUILD SUCCESS
+     [INFO] ------------------------------------------------------------------------
+     [INFO] Total time:  0.846 s
+     [INFO] Finished at: 2020-07-24T14:25:54+08:00
+     [INFO] ------------------------------------------------------------------------
+
+     -> double click install
+
+     "C:\Program Files\Java\jdk-13\bin\java.exe" -Dmaven.multiModuleProjectDirectory=C:\Users\donat\Downloads\react-spring-boot-package "-Dmaven.home=C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\plugins\maven\lib\maven3" "-Dclassworlds.conf=C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\plugins\maven\lib\maven3\bin\m2.conf" "-Dmaven.ext.class.path=C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\plugins\maven\lib\maven-event-listener.jar" "-javaagent:C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\lib\idea_rt.jar=63429:C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\bin" -Dfile.encoding=UTF-8 -classpath "C:\Program Files\JetBrains\IntelliJ IDEA Community Edition 2019.2.3\plugins\maven\lib\maven3\boot\plexus-classworlds-2.6.0.jar" org.codehaus.classworlds.Launcher -Didea.version2019.2.3 install
+     [INFO] Scanning for projects...
+     [INFO]
+     [INFO] ---------------< com.example:react-spring-boot-package >----------------
+     [INFO] Building react-spring-boot-package 0.0.1-SNAPSHOT
+     [INFO] --------------------------------[ jar ]---------------------------------
+     [INFO]
+     [INFO] --- frontend-maven-plugin:1.6:install-node-and-npm (install node and npm) @ react-spring-boot-package ---
+     [INFO] Installing node version v8.9.4
+     [INFO] Copying node binary from C:\Users\donat\.m2\repository\com\github\eirslett\node\8.9.4\node-8.9.4-win-x64.exe to C:\Users\donat\Downloads\react-spring-boot-package\target\node\node.exe
+     [INFO] Installed node locally.
+     [INFO] Installing npm version 5.6.0
+     [INFO] Unpacking C:\Users\donat\.m2\repository\com\github\eirslett\npm\5.6.0\npm-5.6.0.tar.gz into C:\Users\donat\Downloads\react-spring-boot-package\target\node\node_modules
+     [INFO] Installed npm locally.
+     [INFO]
+     [INFO] --- frontend-maven-plugin:1.6:npm (npm install) @ react-spring-boot-package ---
+     [INFO] Running 'npm install' in C:\Users\donat\Downloads\react-spring-boot-package\frontend
+     [WARNING] npm WARN react-scripts@3.4.1 requires a peer of typescript@^3.2.1 but none is installed. You must install peer dependencies yourself.
+     [WARNING] npm WARN sass-loader@8.0.2 requires a peer of node-sass@^4.0.0 but none is installed. You must install peer dependencies yourself.
+     [WARNING] npm WARN sass-loader@8.0.2 requires a peer of sass@^1.3.0 but none is installed. You must install peer dependencies yourself.
+     [WARNING] npm WARN sass-loader@8.0.2 requires a peer of fibers@>= 3.1.0 but none is installed. You must install peer dependencies yourself.
+     [WARNING] npm WARN tsutils@3.17.1 requires a peer of typescript@>=2.8.0 || >= 3.2.0-dev || >= 3.3.0-dev || >= 3.4.0-dev || >= 3.5.0-dev || >= 3.6.0-dev || >= 3.6.0-beta || >= 3.7.0-dev || >= 3.7.0-beta but none is installed. You must install peer dependencies yourself.
+     [INFO] up to date in 8.903s
+     [WARNING] npm WARN optional SKIPPING OPTIONAL DEPENDENCY: fsevents@1.2.13 (node_modules\jest-haste-map\node_modules\fsevents):
+     [WARNING] npm WARN notsup SKIPPING OPTIONAL DEPENDENCY: Unsupported platform for fsevents@1.2.13: wanted {"os":"darwin","arch":"any"} (current: {"os":"win32","arch":"x64"})
+     [WARNING] npm WARN optional SKIPPING OPTIONAL DEPENDENCY: fsevents@1.2.13 (node_modules\watchpack-chokidar2\node_modules\fsevents):
+     [WARNING] npm WARN notsup SKIPPING OPTIONAL DEPENDENCY: Unsupported platform for fsevents@1.2.13: wanted {"os":"darwin","arch":"any"} (current: {"os":"win32","arch":"x64"})
+     [WARNING] npm WARN optional SKIPPING OPTIONAL DEPENDENCY: fsevents@1.2.13 (node_modules\webpack-dev-server\node_modules\fsevents):
+     [WARNING] npm WARN notsup SKIPPING OPTIONAL DEPENDENCY: Unsupported platform for fsevents@1.2.13: wanted {"os":"darwin","arch":"any"} (current: {"os":"win32","arch":"x64"})
+     [WARNING] npm WARN optional SKIPPING OPTIONAL DEPENDENCY: fsevents@2.1.2 (node_modules\fsevents):
+     [WARNING] npm WARN notsup SKIPPING OPTIONAL DEPENDENCY: Unsupported platform for fsevents@2.1.2: wanted {"os":"darwin","arch":"any"} (current: {"os":"win32","arch":"x64"})
+     [ERROR]
+     [INFO]
+     [INFO] --- frontend-maven-plugin:1.6:npm (npm run build) @ react-spring-boot-package ---
+     [INFO] Running 'npm run build' in C:\Users\donat\Downloads\react-spring-boot-package\frontend
+     [INFO]
+     [INFO] > frontend@0.1.0 build C:\Users\donat\Downloads\react-spring-boot-package\frontend
+     [INFO] > react-scripts build
+     [INFO]
+     [INFO] Creating an optimized production build...
+     [INFO] Compiled with warnings.
+     [INFO]
+     [INFO] ./src/index.js
+     [INFO] Invalid regular expression flags
+     [INFO]
+     [INFO] ./src/App.js
+     [INFO] Invalid regular expression flags
+     [INFO] Occurred while linting C:\Users\donat\Downloads\react-spring-boot-package\frontend\src\App.js
+     [INFO]
+     [INFO] ./src/serviceWorker.js
+     [INFO] Invalid regular expression flags
+     [INFO] Occurred while linting C:\Users\donat\Downloads\react-spring-boot-package\frontend\src\serviceWorker.js
+     [INFO]
+     [INFO] Search for the keywords to learn more about each warning.
+     [INFO] To ignore, add // eslint-disable-next-line to the line before.
+     [INFO]
+     [INFO] File sizes after gzip:
+     [INFO]
+     [INFO]   39.77 KB  build\static\js\2.5fd793c9.chunk.js
+     [INFO]   770 B     build\static\js\runtime-main.c8a21426.js
+     [INFO]   732 B     build\static\js\main.055f466e.chunk.js
+     [INFO]   547 B     build\static\css\main.5f361e03.chunk.css
+     [INFO]
+     [INFO] The project was built assuming it is hosted at /.
+     [INFO] You can control this with the homepage field in your package.json.
+     [INFO]
+     [INFO] The build folder is ready to be deployed.
+     [INFO] You may serve it with a static server:
+     [INFO]
+     [INFO]   npm install -g serve
+     [INFO]   serve -s build
+     [INFO]
+     [INFO] Find out more about deployment here:
+     [INFO]
+     [INFO]   bit.ly/CRA-deploy
+     [INFO]
+     [INFO]
+     [INFO] --- maven-resources-plugin:3.1.0:resources (default-resources) @ react-spring-boot-package ---
+     [INFO] Using 'UTF-8' encoding to copy filtered resources.
+     [INFO] Copying 1 resource
+     [INFO] Copying 0 resource
+     [INFO]
+     [INFO] --- maven-compiler-plugin:3.8.1:compile (default-compile) @ react-spring-boot-package ---
+     [INFO] Changes detected - recompiling the module!
+     [INFO] Compiling 2 source files to C:\Users\donat\Downloads\react-spring-boot-package\target\classes
+     [INFO]
+     [INFO] --- maven-resources-plugin:3.1.0:testResources (default-testResources) @ react-spring-boot-package ---
+     [INFO] Using 'UTF-8' encoding to copy filtered resources.
+     [INFO] skip non existing resourceDirectory C:\Users\donat\Downloads\react-spring-boot-package\src\test\resources
+     [INFO]
+     [INFO] --- maven-compiler-plugin:3.8.1:testCompile (default-testCompile) @ react-spring-boot-package ---
+     [INFO] Changes detected - recompiling the module!
+     [INFO] Compiling 1 source file to C:\Users\donat\Downloads\react-spring-boot-package\target\test-classes
+     [INFO]
+     [INFO] --- maven-surefire-plugin:2.22.2:test (default-test) @ react-spring-boot-package ---
+     [INFO]
+     [INFO] -------------------------------------------------------
+     [INFO]  T E S T S
+     [INFO] -------------------------------------------------------
+     [INFO] Running com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests
+     14:27:48.727 [main] DEBUG org.springframework.test.context.BootstrapUtils - Instantiating CacheAwareContextLoaderDelegate from class [org.springframework.test.context.cache.DefaultCacheAwareContextLoaderDelegate]
+     14:27:48.741 [main] DEBUG org.springframework.test.context.BootstrapUtils - Instantiating BootstrapContext using constructor [public org.springframework.test.context.support.DefaultBootstrapContext(java.lang.Class,org.springframework.test.context.CacheAwareContextLoaderDelegate)]
+     14:27:48.777 [main] DEBUG org.springframework.test.context.BootstrapUtils - Instantiating TestContextBootstrapper for test class [com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests] from class [org.springframework.boot.test.context.SpringBootTestContextBootstrapper]
+     14:27:48.797 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper - Neither @ContextConfiguration nor @ContextHierarchy found for test class [com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests], using SpringBootContextLoader
+     14:27:48.802 [main] DEBUG org.springframework.test.context.support.AbstractContextLoader - Did not detect default resource location for test class [com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests]: class path resource [com/example/reactspringbootpackage/ReactSpringBootPackageApplicationTests-context.xml] does not exist
+     14:27:48.803 [main] DEBUG org.springframework.test.context.support.AbstractContextLoader - Did not detect default resource location for test class [com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests]: class path resource [com/example/reactspringbootpackage/ReactSpringBootPackageApplicationTestsContext.groovy] does not exist
+     14:27:48.803 [main] INFO org.springframework.test.context.support.AbstractContextLoader - Could not detect default resource locations for test class [com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests]: no resource found for suffixes {-context.xml, Context.groovy}.
+     14:27:48.804 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils - Could not detect default configuration classes for test class [com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests]: ReactSpringBootPackageApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+     14:27:48.851 [main] DEBUG org.springframework.test.context.support.ActiveProfilesUtils - Could not find an 'annotation declaring class' for annotation type [org.springframework.test.context.ActiveProfiles] and class [com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests]
+     14:27:48.921 [main] DEBUG org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider - Identified candidate component class: file [C:\Users\donat\Downloads\react-spring-boot-package\target\classes\com\example\reactspringbootpackage\ReactSpringBootPackageApplication.class]
+     14:27:48.923 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper - Found @SpringBootConfiguration com.example.reactspringbootpackage.ReactSpringBootPackageApplication for test class com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests
+     14:27:49.033 [main] DEBUG org.springframework.boot.test.context.SpringBootTestContextBootstrapper - @TestExecutionListeners is not present for class [com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests]: using defaults.
+     14:27:49.033 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper - Loaded default TestExecutionListener class names from location [META-INF/spring.factories]: [org.springframework.boot.test.mock.mockito.MockitoTestExecutionListener, org.springframework.boot.test.mock.mockito.ResetMocksTestExecutionListener, org.springframework.boot.test.autoconfigure.restdocs.RestDocsTestExecutionListener, org.springframework.boot.test.autoconfigure.web.client.MockRestServiceServerResetTestExecutionListener, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrintOnlyOnFailureTestExecutionListener, org.springframework.boot.test.autoconfigure.web.servlet.WebDriverTestExecutionListener, org.springframework.boot.test.autoconfigure.webservices.client.MockWebServiceServerTestExecutionListener, org.springframework.test.context.web.ServletTestExecutionListener, org.springframework.test.context.support.DirtiesContextBeforeModesTestExecutionListener, org.springframework.test.context.support.DependencyInjectionTestExecutionListener, org.springframework.test.context.support.DirtiesContextTestExecutionListener, org.springframework.test.context.transaction.TransactionalTestExecutionListener, org.springframework.test.context.jdbc.SqlScriptsTestExecutionListener, org.springframework.test.context.event.EventPublishingTestExecutionListener]
+     14:27:49.046 [main] DEBUG org.springframework.boot.test.context.SpringBootTestContextBootstrapper - Skipping candidate TestExecutionListener [org.springframework.test.context.transaction.TransactionalTestExecutionListener] due to a missing dependency. Specify custom listener classes or make the default listener classes and their required dependencies available. Offending class: [org/springframework/transaction/interceptor/TransactionAttributeSource]
+     14:27:49.047 [main] DEBUG org.springframework.boot.test.context.SpringBootTestContextBootstrapper - Skipping candidate TestExecutionListener [org.springframework.test.context.jdbc.SqlScriptsTestExecutionListener] due to a missing dependency. Specify custom listener classes or make the default listener classes and their required dependencies available. Offending class: [org/springframework/transaction/interceptor/TransactionAttribute]
+     14:27:49.047 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper - Using TestExecutionListeners: [org.springframework.test.context.web.ServletTestExecutionListener@6a47b187, org.springframework.test.context.support.DirtiesContextBeforeModesTestExecutionListener@2049a9c1, org.springframework.boot.test.mock.mockito.MockitoTestExecutionListener@1ef6d34c, org.springframework.boot.test.autoconfigure.SpringBootDependencyInjectionTestExecutionListener@46271dd6, org.springframework.test.context.support.DirtiesContextTestExecutionListener@11bb571c, org.springframework.test.context.event.EventPublishingTestExecutionListener@7c51f34b, org.springframework.boot.test.mock.mockito.ResetMocksTestExecutionListener@5495333e, org.springframework.boot.test.autoconfigure.restdocs.RestDocsTestExecutionListener@2a225dd7, org.springframework.boot.test.autoconfigure.web.client.MockRestServiceServerResetTestExecutionListener@61eaec38, org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrintOnlyOnFailureTestExecutionListener@125290e5, org.springframework.boot.test.autoconfigure.web.servlet.WebDriverTestExecutionListener@6fa34d52, org.springframework.boot.test.autoconfigure.webservices.client.MockWebServiceServerTestExecutionListener@57576994]
+     14:27:49.050 [main] DEBUG org.springframework.test.context.support.AbstractDirtiesContextTestExecutionListener - Before test class: context [DefaultTestContext@7d3d101b testClass = ReactSpringBootPackageApplicationTests, testInstance = [null], testMethod = [null], testException = [null], mergedContextConfiguration = [WebMergedContextConfiguration@30c8681 testClass = ReactSpringBootPackageApplicationTests, locations = '{}', classes = '{class com.example.reactspringbootpackage.ReactSpringBootPackageApplication}', contextInitializerClasses = '[]', activeProfiles = '{}', propertySourceLocations = '{}', propertySourceProperties = '{org.springframework.boot.test.context.SpringBootTestContextBootstrapper=true}', contextCustomizers = set[org.springframework.boot.test.context.filter.ExcludeFilterContextCustomizer@ba54932, org.springframework.boot.test.json.DuplicateJsonObjectContextCustomizerFactory$DuplicateJsonObjectContextCustomizer@343570b7, org.springframework.boot.test.mock.mockito.MockitoContextCustomizer@0, org.springframework.boot.test.web.client.TestRestTemplateContextCustomizer@68e965f5, org.springframework.boot.test.autoconfigure.properties.PropertyMappingContextCustomizer@0, org.springframework.boot.test.autoconfigure.web.servlet.WebDriverContextCustomizerFactory$Customizer@4cc8eb05, org.springframework.boot.test.context.SpringBootTestArgs@1], resourceBasePath = 'src/main/webapp', contextLoader = 'org.springframework.boot.test.context.SpringBootContextLoader', parent = [null]], attributes = map['org.springframework.test.context.web.ServletTestExecutionListener.activateListener' -> true]], class annotated with @DirtiesContext [false] with mode [null].
+     14:27:49.080 [main] DEBUG org.springframework.test.context.support.TestPropertySourceUtils - Adding inlined properties to environment: {spring.jmx.enabled=false, org.springframework.boot.test.context.SpringBootTestContextBootstrapper=true}
+
+       .   ____          _            __ _ _
+      /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+     ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+      \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+       '  |____| .__|_| |_|_| |_\__, | / / / /
+      =========|_|==============|___/=/_/_/_/
+      :: Spring Boot ::        (v2.3.1.RELEASE)
+
+     2020-07-24 14:27:49.379  INFO 13364 --- [           main] r.ReactSpringBootPackageApplicationTests : Starting ReactSpringBootPackageApplicationTests on DESKTOP-ADOT1IA with PID 13364 (started by donat in C:\Users\donat\Downloads\react-spring-boot-package)
+     2020-07-24 14:27:49.381  INFO 13364 --- [           main] r.ReactSpringBootPackageApplicationTests : No active profile set, falling back to default profiles: default
+     2020-07-24 14:27:50.528  INFO 13364 --- [           main] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+     2020-07-24 14:27:50.804  INFO 13364 --- [           main] r.ReactSpringBootPackageApplicationTests : Started ReactSpringBootPackageApplicationTests in 1.713 seconds (JVM running for 2.723)
+     [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.737 s - in com.example.reactspringbootpackage.ReactSpringBootPackageApplicationTests
+     2020-07-24 14:27:51.333  INFO 13364 --- [extShutdownHook] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+     [INFO]
+     [INFO] Results:
+     [INFO]
+     [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+     [INFO]
+     [INFO]
+     [INFO] --- maven-jar-plugin:3.2.0:jar (default-jar) @ react-spring-boot-package ---
+     [INFO] Building jar: C:\Users\donat\Downloads\react-spring-boot-package\target\react-spring-boot-package-0.0.1-SNAPSHOT.jar
+     [INFO]
+     [INFO] --- spring-boot-maven-plugin:2.3.1.RELEASE:repackage (repackage) @ react-spring-boot-package ---
+     [INFO] Replacing main artifact with repackaged archive
+     [INFO]
+     [INFO] --- maven-install-plugin:2.5.2:install (default-install) @ react-spring-boot-package ---
+     [INFO] Installing C:\Users\donat\Downloads\react-spring-boot-package\target\react-spring-boot-package-0.0.1-SNAPSHOT.jar to C:\Users\donat\.m2\repository\com\example\react-spring-boot-package\0.0.1-SNAPSHOT\react-spring-boot-package-0.0.1-SNAPSHOT.jar
+     [INFO] Installing C:\Users\donat\Downloads\react-spring-boot-package\pom.xml to C:\Users\donat\.m2\repository\com\example\react-spring-boot-package\0.0.1-SNAPSHOT\react-spring-boot-package-0.0.1-SNAPSHOT.pom
+     [INFO] ------------------------------------------------------------------------
+     [INFO] BUILD SUCCESS
+     [INFO] ------------------------------------------------------------------------
+     [INFO] Total time:  35.919 s
+     [INFO] Finished at: 2020-07-24T14:27:52+08:00
+     [INFO] ------------------------------------------------------------------------
+
+     This results in a production build of the frontend in frontend/build:
+
+     frontend/build
+        |->static
+        |   |->css
+        |   |->js
+        |   |->media
+        |->asset-manifest.json
+        |->favicon.ico
+        |->index.html
+        |->logo192.png
+        |->logo512.png
+        |->manifest.json
+        |->precache-manifest4d186258b43ad1
+        |->robots.txt
+        |->service-workers.js
+
+----------------------------------------------------------------------------------
+
+Include frontend build files in spring boot jar
+    We now have to copy these files to target/classes/public in order
+    to serve them as static resources from the Spring Boot application.
+
+    We'll use the ant plugin for this.
+
+    Add the following to pom.xml under /build/plugins:
+
+         <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <executions>
+                <execution>
+                    <phase>generate-resources</phase>
+                    <configuration>
+                        <target>
+                            <copy todir="${project.build.directory}/classes/public">
+                                <fileset dir="${project.basedir}/frontend/build"/>
+                            </copy>
+                        </target>
+                    </configuration>
+                    <goals>
+                        <goal>run</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+
+    This will ensure that the frontend build files are
+    copied after they have been generated by npm build.
+
+    Run maven again, and inspect the contents of the target/classes directory:
+
+         -> click Maven on right side on the IntelliJ
+         -> click react-spring-boot-package
+         -> click Lifecycle
+         -> double click clean
+         -> double click install
+
+    You should also check that the files are present in the resulting jar file:
+
+    test
+     |->antrun
+     |->classes
+     |->generated-sources
+     |->generated-test-sources
+     |->maven-archiver
+     |->maven-status
+     |->node
+     |->surefire-reports
+     |->test-classes
+     |->react-spring-boot-package-0.0.1-SNAPSHOT.jar
+     |->react-spring-boot-package-0.0.1-SNAPSHOT.jar.original
+
+     Now, we're ready to start the application.
+     Make sure you quit any running servers, and run the jar file
+
+     Copy react-spring-boot-package-0.0.1-SNAPSHOT.jar and paste on Documents.
+     Open cmd then type below to run the jar file
+
+        cd Documents
+        java -jar react-spring-boot-package-0.0.1-SNAPSHOT.jar
+
+
+       .   ____          _            __ _ _
+      /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+     ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+      \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+       '  |____| .__|_| |_|_| |_\__, | / / / /
+      =========|_|==============|___/=/_/_/_/
+      :: Spring Boot ::        (v2.3.1.RELEASE)
+
+     2020-07-24 14:40:19.011  INFO 11076 --- [           main] c.e.r.ReactSpringBootPackageApplication  : Starting ReactSpringBootPackageApplication v0.0.1-SNAPSHOT on DESKTOP-ADOT1IA with PID 11076 (C:\Users\donat\Documents\react-spring-boot-package-0.0.1-SNAPSHOT.jar started by donat in C:\Users\donat\Documents)
+     2020-07-24 14:40:19.014  INFO 11076 --- [           main] c.e.r.ReactSpringBootPackageApplication  : No active profile set, falling back to default profiles: default
+     2020-07-24 14:40:20.481  INFO 11076 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+     2020-07-24 14:40:20.497  INFO 11076 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+     2020-07-24 14:40:20.498  INFO 11076 --- [           main] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+     2020-07-24 14:40:20.595  INFO 11076 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+     2020-07-24 14:40:20.595  INFO 11076 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1523 ms
+     2020-07-24 14:40:20.800  INFO 11076 --- [           main] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+     2020-07-24 14:40:20.876  INFO 11076 --- [           main] o.s.b.a.w.s.WelcomePageHandlerMapping    : Adding welcome page: class path resource [public/index.html]
+     2020-07-24 14:40:21.202  INFO 11076 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+     2020-07-24 14:40:21.215  INFO 11076 --- [           main] c.e.r.ReactSpringBootPackageApplication  : Started ReactSpringBootPackageApplication in 2.687 seconds (JVM running for 3.141)
+
+    Check on web browser by typing : localhost:8080
+
+----------------------------------------------------------------------------------
+
+    Checking it on IntelliJ by running the program,
+
+        -> Edit Configurations (left side on the run button)
+        -> click +
+        -> choose Maven
+        -> type on command : clean install
+        -> Apply
+        -> Ok
+        -> Edit Configurations (left side on the run button) - change to the default Setting
+        -> click Run button
+
+----------------------------------------------------------------------------------
